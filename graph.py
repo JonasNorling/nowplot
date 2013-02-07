@@ -152,11 +152,19 @@ class GraphWidget(gtk.DrawingArea):
         ctx.restore()
 
     def draw_sample(self, values):
+        if len(values) < 2:
+            return
+
         x_value = values[0]
+        y_value = values[1]
+
+        if x_value is None or y_value is None:
+            return
+
         if self.x_wrap:
             x_value = (x_value - self.x_axis.min) % (self.x_axis.max-self.x_axis.min) + self.x_axis.min
         x = (x_value - self.x_axis.min) / (self.x_axis.max-self.x_axis.min) * self.diagram_size[0]
-        y = (values[1] - self.y_axis.min) / (self.y_axis.max-self.y_axis.min) * self.diagram_size[1]
+        y = (y_value - self.y_axis.min) / (self.y_axis.max-self.y_axis.min) * self.diagram_size[1]
 
         ser = self.series[0]
 

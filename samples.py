@@ -7,16 +7,17 @@ import gobject
 import time
 
 class Collector(object):
-    def __init__(self, fd):
+    def __init__(self, fd, separator):
         self.fd = fd
         self.count = 0
         self.prepend_timestamp = False
         self.prepend_count = False
+        self.separator = separator
         gobject.io_add_watch(self.fd, gobject.IO_IN, self.parse_input)
 
     def parse_input(self, source, condition):
         line = self.fd.readline()
-        items = line.split()
+        items = line.split(self.separator)
         values = []
 
         if self.prepend_timestamp:

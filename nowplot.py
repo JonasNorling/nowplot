@@ -37,6 +37,8 @@ if __name__ == '__main__':
     group = optparse.OptionGroup(parser, "Sample collection options")
     group.add_option("-W", "--watch", dest="watch", default=False, action="store_true",
                      help="Watch the input file for new lines. Default for stdin")
+    group.add_option("-F", "--field-separator", dest="separator", default=" ", metavar="FS",
+                     help="Set the input field separator. Default is a space")
     group.add_option("-t", "--time", dest="time", default=False, action="store_true",
                      help="Use current time as X value")
     group.add_option("-c", "--count", dest="count", default=False, action="store_true",
@@ -51,7 +53,7 @@ if __name__ == '__main__':
         infile = sys.stdin
     else:
         infile = open(args[0])
-    collector = samples.Collector(infile)
+    collector = samples.Collector(infile, options.separator)
 
     if options.time:
         collector.set_prepend_timestamp(True)
