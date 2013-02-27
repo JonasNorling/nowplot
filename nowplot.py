@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_option("-y", "--y-axis", dest="y_axis", default="0:10",
                       help="Y axis specification: <start>:<end> | follow", metavar="SPEC")
     parser.add_option("-s", "--series", dest="series", default="",
-                      help="Series specification: [{l|p|lp|v}[<width>]][:#<color>][:<name>],...", metavar="SPEC")
+                      help="Series specification: [{l|p|lp|v}[<width>]][:#<color>][:<name>],... or - to skip a series", metavar="SPEC")
     parser.add_option("-w", "--wrap", dest="wrap", default=False, action="store_true",
                       help="Wrap x axis, drawing samples in a modulo fashion")
     parser.add_option("-r", "--rate", dest="rate", default=50, type="int", metavar="N",
