@@ -34,6 +34,9 @@ class GraphWidget(gtk.DrawingArea):
         self.diagram_origin = (30, 20)
         self.current_sample_pos = {}
 
+        self.backbuffer = None
+        self.axisbuffer = None
+
     def parse_axis_spec(self, a):
         axis = Axis()
         (min, max) = a.split(":")
@@ -105,6 +108,7 @@ class GraphWidget(gtk.DrawingArea):
     def on_realize(self, widget):
         self.realized = True
         winctx = self.window.cairo_create()
+        old_backbuffer = self.backbuffer
         self.backbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
                                                              self.size[0], self.size[1])
         self.axisbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
@@ -115,13 +119,21 @@ class GraphWidget(gtk.DrawingArea):
         self.axctx.set_source_rgb(0, 0, 0)
         self.axctx.paint()
 
+        # Copy and scale contents from old buffer to the new one
+        if old_backbuffer is not None:
+            self.bbctx.save()
+            self.bbctx.scale(1.0 * self.backbuffer.get_width() / old_backbuffer.get_width(),
+                             1.0 * self.backbuffer.get_height() / old_backbuffer.get_height())
+            self.bbctx.set_source_surface(old_backbuffer)
+            self.bbctx.paint()
+            self.bbctx.restore()
+
         # Flip coordinate system upside-down
         self.bbctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
         self.bbctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
         self.axctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
         self.axctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
         self.draw_axes()
-
 
     def on_configure_event(self, widget, event):
         self.size = (event.width, event.height)
