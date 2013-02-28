@@ -12,7 +12,8 @@ import gtk
 epilog=\
 """If no input file is specified, standard input it used. Letters in series
 specifications: l=line, p=point, lp=line and point, v=vertical line for non-zero samples (event).
-Colors are given as six-digit hex strings (#ff6666 is a lovely shade of pink).
+Colors are given as six-digit hex strings (#ff6666 is a lovely shade of pink) or as an
+eight-digit string with alpha first.
 """
 description=\
 "Open an X window, plotting a diagram that is updated in realtime."

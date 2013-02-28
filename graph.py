@@ -67,10 +67,12 @@ class GraphWidget(gtk.DrawingArea):
             if type is not None: series.line = "l" in type
             if color is not None:
                 color = int(color, 16)
+                # Set alpha to opaque if not specified
+                if (color >> 24) & 0xff == 0: color = color | 0xff000000
                 series.color = (((color >> 16) & 0xff) / 256.0,
                                 ((color >>  8) & 0xff) / 256.0,
                                 ((color      ) & 0xff) / 256.0,
-                                1.0)
+                                ((color >> 24) & 0xff) / 256.0)
             if label is not None: series.label = label
             self.series.append(series)
 
