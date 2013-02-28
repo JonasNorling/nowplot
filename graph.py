@@ -32,7 +32,10 @@ class GraphWidget(gtk.DrawingArea):
         self.connect("realize", self.on_realize)
 
         self.diagram_origin = (30, 20)
-        self.current_sample_pos = (0, 0)
+        self.current_sample_pos = {}
+
+        self.backbuffer = None
+        self.axisbuffer = None
 
     def parse_axis_spec(self, a):
         axis = Axis()
@@ -57,23 +60,26 @@ class GraphWidget(gtk.DrawingArea):
         strings = s.split(",")
 
         for string in strings:
-            match = series_re.match(string)
-            if match is None:
-                raise ValueError
-            (type, width, crap, color, crap, label) = match.groups()
-            series = Series()
-            if width is not None: series.linewidth = int(width)
-            if type is not None: series.marker = "p" in type
-            if type is not None: series.line = "l" in type
-            if color is not None:
-                color = int(color, 16)
-                # Set alpha to opaque if not specified
-                if (color >> 24) & 0xff == 0: color = color | 0xff000000
-                series.color = (((color >> 16) & 0xff) / 256.0,
-                                ((color >>  8) & 0xff) / 256.0,
-                                ((color      ) & 0xff) / 256.0,
-                                ((color >> 24) & 0xff) / 256.0)
-            if label is not None: series.label = label
+            if string == "-":
+                series = None
+            else:
+                match = series_re.match(string)
+                if match is None:
+                    raise ValueError
+                (type, width, crap, color, crap, label) = match.groups()
+                series = Series()
+                if width is not None: series.linewidth = int(width)
+                if type is not None: series.marker = "p" in type
+                if type is not None: series.line = "l" in type
+                if color is not None:
+                    color = int(color, 16)
+                    # Set alpha to opaque if not specified
+                    if (color >> 24) & 0xff == 0: color = color | 0xff000000
+                    series.color = (((color >> 16) & 0xff) / 256.0,
+                                    ((color >>  8) & 0xff) / 256.0,
+                                    ((color      ) & 0xff) / 256.0,
+                                    ((color >> 24) & 0xff) / 256.0)
+                if label is not None: series.label = label
             self.series.append(series)
 
     def set_wrap(self, v):
@@ -104,6 +110,7 @@ class GraphWidget(gtk.DrawingArea):
     def on_realize(self, widget):
         self.realized = True
         winctx = self.window.cairo_create()
+        old_backbuffer = self.backbuffer
         self.backbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
                                                              self.size[0], self.size[1])
         self.axisbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
@@ -114,13 +121,21 @@ class GraphWidget(gtk.DrawingArea):
         self.axctx.set_source_rgb(0, 0, 0)
         self.axctx.paint()
 
+        # Copy and scale contents from old buffer to the new one
+        if old_backbuffer is not None:
+            self.bbctx.save()
+            self.bbctx.scale(1.0 * self.backbuffer.get_width() / old_backbuffer.get_width(),
+                             1.0 * self.backbuffer.get_height() / old_backbuffer.get_height())
+            self.bbctx.set_source_surface(old_backbuffer)
+            self.bbctx.paint()
+            self.bbctx.restore()
+
         # Flip coordinate system upside-down
         self.bbctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
         self.bbctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
         self.axctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
         self.axctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
         self.draw_axes()
-
 
     def on_configure_event(self, widget, event):
         self.size = (event.width, event.height)
@@ -136,13 +151,14 @@ class GraphWidget(gtk.DrawingArea):
         winctx.paint()
 
         # Highlight current sample
-        winctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
-        winctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
-        winctx.set_source_rgba(1, 0.6, 0, 1)
-        winctx.arc(self.current_sample_pos[0], self.current_sample_pos[1],
-                   4, 0, math.pi*2)
-        winctx.fill()
-        winctx.stroke()
+        if 0 in self.current_sample_pos:
+            pos = self.current_sample_pos[0]
+            winctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
+            winctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
+            winctx.set_source_rgba(1, 0.6, 0, 1)
+            winctx.arc(pos[0], pos[1], 4, 0, math.pi*2)
+            winctx.fill()
+            winctx.stroke()
         return True
 
     def fade(self):
@@ -157,33 +173,41 @@ class GraphWidget(gtk.DrawingArea):
         if len(values) < 2:
             return
 
-        x_value = values[0]
-        y_value = values[1]
+        ctx = self.bbctx
 
-        if x_value is None or y_value is None:
+        x_value = values[0]
+        if x_value is None:
             return
 
         if self.x_wrap:
             x_value = (x_value - self.x_axis.min) % (self.x_axis.max-self.x_axis.min) + self.x_axis.min
         x = (x_value - self.x_axis.min) / (self.x_axis.max-self.x_axis.min) * self.diagram_size[0]
-        y = (y_value - self.y_axis.min) / (self.y_axis.max-self.y_axis.min) * self.diagram_size[1]
 
-        ser = self.series[0]
+        for ser_no in range(0, len(self.series)):
+            y_value = values[ser_no + 1]
 
-        ctx = self.bbctx
-        ctx.set_source_rgba(*ser.color)
-        ctx.set_line_width(ser.linewidth)
-        if ser.line and x >= self.current_sample_pos[0]:
-            ctx.line_to(x, y)
-        else:
+            ser = self.series[ser_no]
+            if ser is None: continue
+            if y_value is None: continue
+
+            y = (y_value - self.y_axis.min) / (self.y_axis.max-self.y_axis.min) * self.diagram_size[1]
+
+            ctx.set_source_rgba(*ser.color)
+            ctx.set_line_width(ser.linewidth)
+            if ser.line and \
+                    ser_no in self.current_sample_pos and \
+                    x >= self.current_sample_pos[ser_no][0]:
+                ctx.move_to(*self.current_sample_pos[ser_no])
+                ctx.line_to(x, y)
+            else:
+                ctx.move_to(x, y)
+            if ser.marker:
+                ctx.new_sub_path()
+                ctx.arc(x, y, 2, 0, math.pi*2)
+            ctx.stroke()
             ctx.move_to(x, y)
-        if ser.marker:
-            ctx.new_sub_path()
-            ctx.arc(x, y, 2, 0, math.pi*2)
-        ctx.stroke()
-        ctx.move_to(x, y)
 
-        self.current_sample_pos = (x, y)
+            self.current_sample_pos[ser_no] = (x, y)
 
     def draw_axes(self):
         ctx = self.axctx
@@ -280,7 +304,7 @@ class MainWindow(gtk.Window):
         main_box.pack_start(self.graph, True)
 
         gobject.timeout_add(50, lambda: self.graph.queue_draw() or True)
-        gobject.timeout_add(500, lambda: self.graph.fade() or True)
+        #gobject.timeout_add(500, lambda: self.graph.fade() or True)
         self.show_all()
 
     def quit_callback(self, b):
