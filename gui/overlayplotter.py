@@ -47,7 +47,8 @@ class OverlayPlotter(object):
         
         ctx.set_source_rgba(*self.gridcolor)
         ctx.set_font_size(10)
-        x_tick = self.xAxis.min
+        
+        x_tick = round(self.xAxis.min, self.xAxis.tickdecimals)
         while x_tick <= self.xAxis.max:
             x = (x_tick - self.xAxis.min) * (self.size[0] / float(self.xAxis.max - self.xAxis.min))
             ctx.move_to(x, self.size[1])
@@ -72,7 +73,7 @@ class OverlayPlotter(object):
 
             x_tick += self.xAxis.ticksize
     
-        y_tick = self.yAxis.min
+        y_tick = round(self.yAxis.min, self.yAxis.tickdecimals)
         while y_tick <= self.yAxis.max:
             y = (y_tick - self.yAxis.min) * (self.size[1] / float(self.yAxis.max - self.yAxis.min))
             ctx.move_to(self.size[0], y)

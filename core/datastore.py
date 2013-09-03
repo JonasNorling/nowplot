@@ -21,6 +21,7 @@ class Series(object):
         self.currentSubseries = self.subseries[-1]
         
     def addSample(self, x, y):
+        """Add an absolute sample value at the point (x,y), where x typically is monotonic time"""
         if self.currentSubseries.pos >= ARRAYSIZE:
             # Start a new sub-series
             self.currentSubseries.full = True
@@ -33,13 +34,18 @@ class Series(object):
             self.currentSubseries.xrange[0] = x
         self.currentSubseries.xrange[1] = x # x is monotonic!
 
-
 class Datastore(object):
     def __init__(self):
         self.series = []
         pass
     
-    def addSeries(self, name):
-        s = Series(name)
+    def addSeries(self, name, **kwargs):
+        s = Series(name, **kwargs)
         self.series.append(s)
         return s
+
+    def close(self, x):
+        """Indicate that no more data will be added before this X position"""
+        # We now need to pad all series with zeros up to this point in time. Crap.
+        pass
+    

@@ -34,8 +34,8 @@ class GraphWidget(gtk.DrawingArea):
         self.diagram_origin = (30, 20)
         self.current_sample_pos = {}
 
-        self.backbuffer = None
-        self.axisbuffer = None
+        self.plotbuffer = None
+        self.overlaybuffer = None
 
     def parse_axis_spec(self, a):
         axis = Axis()
@@ -100,7 +100,7 @@ class GraphWidget(gtk.DrawingArea):
         #                                                          self.x_axis.tickdecimals)
 
         if self.realized:
-            ctx = self.bbctx
+            ctx = self.plotctx
             ctx.save()
             ctx.set_source_rgb(0, 0, 0)
             ctx.paint()
@@ -110,31 +110,31 @@ class GraphWidget(gtk.DrawingArea):
     def on_realize(self, widget):
         self.realized = True
         winctx = self.window.cairo_create()
-        old_backbuffer = self.backbuffer
-        self.backbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
+        old_backbuffer = self.plotbuffer
+        self.plotbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
                                                              self.size[0], self.size[1])
-        self.axisbuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
+        self.overlaybuffer = winctx.get_target().create_similar(cairo.CONTENT_COLOR_ALPHA,
                                                              self.size[0], self.size[1])
-        self.bbctx = cairo.Context(self.backbuffer)
-        self.axctx = cairo.Context(self.axisbuffer)
+        self.plotctx = cairo.Context(self.plotbuffer)
+        self.overlayctx = cairo.Context(self.overlaybuffer)
 
-        self.axctx.set_source_rgb(0, 0, 0)
-        self.axctx.paint()
+        self.overlayctx.set_source_rgb(0, 0, 0)
+        self.overlayctx.paint()
 
         # Copy and scale contents from old buffer to the new one
         if old_backbuffer is not None:
-            self.bbctx.save()
-            self.bbctx.scale(1.0 * self.backbuffer.get_width() / old_backbuffer.get_width(),
-                             1.0 * self.backbuffer.get_height() / old_backbuffer.get_height())
-            self.bbctx.set_source_surface(old_backbuffer)
-            self.bbctx.paint()
-            self.bbctx.restore()
+            self.plotctx.save()
+            self.plotctx.scale(1.0 * self.plotbuffer.get_width() / old_backbuffer.get_width(),
+                             1.0 * self.plotbuffer.get_height() / old_backbuffer.get_height())
+            self.plotctx.set_source_surface(old_backbuffer)
+            self.plotctx.paint()
+            self.plotctx.restore()
 
         # Flip coordinate system upside-down
-        self.bbctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
-        self.bbctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
-        self.axctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
-        self.axctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
+        self.plotctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
+        self.plotctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
+        self.overlayctx.set_matrix(cairo.Matrix(1, 0, 0, -1, 0, self.size[1]))
+        self.overlayctx.translate(self.diagram_origin[0]+0.5, self.diagram_origin[1]+0.5)
         self.draw_axes()
 
     def on_configure_event(self, widget, event):
@@ -145,9 +145,9 @@ class GraphWidget(gtk.DrawingArea):
 
     def on_expose_event(self, widget, event):
         winctx = self.window.cairo_create()
-        winctx.set_source_surface(self.axisbuffer)
+        winctx.set_source_surface(self.overlaybuffer)
         winctx.paint()
-        winctx.set_source_surface(self.backbuffer)
+        winctx.set_source_surface(self.plotbuffer)
         winctx.paint()
 
         # Highlight current sample
@@ -162,7 +162,7 @@ class GraphWidget(gtk.DrawingArea):
         return True
 
     def fade(self):
-        ctx = self.bbctx
+        ctx = self.plotctx
         ctx.save()
         ctx.set_operator(cairo.OPERATOR_ATOP)
         ctx.set_source_rgba(0.2, 0.1, 0.4, 0.1)
@@ -173,7 +173,7 @@ class GraphWidget(gtk.DrawingArea):
         if len(values) < 2:
             return
 
-        ctx = self.bbctx
+        ctx = self.plotctx
 
         x_value = values[0]
         if x_value is None:
@@ -210,7 +210,7 @@ class GraphWidget(gtk.DrawingArea):
             self.current_sample_pos[ser_no] = (x, y)
 
     def draw_axes(self):
-        ctx = self.axctx
+        ctx = self.overlayctx
         # Draw X and Y axes with arrows
         ctx.set_source_rgba(1, 1, 1, 1)
         ctx.set_line_width(1)

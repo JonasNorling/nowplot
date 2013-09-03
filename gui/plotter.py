@@ -13,10 +13,11 @@ class Plotter(object):
         self.size = size
         self.datastore = datastore
         self.profiles = profiles
-        
+        self.highestX = 0
+
         self.xAxis = xAxis
         self.yAxis = yAxis
-                
+
         self.ctx = cairo.Context(self.surface)
         
         # Flip coordinate system upside-down
@@ -30,6 +31,13 @@ class Plotter(object):
     def setYAxis(self, yAxis):
         self.yAxis = yAxis
     
+    def fade(self):
+        self.ctx.save()
+        self.ctx.set_operator(cairo.OPERATOR_DEST_OUT)
+        self.ctx.set_source_rgba(0.0, 0.0, 0.0, 0.05)
+        self.ctx.paint()
+        self.ctx.restore()
+        
     def draw(self):
         """Draw something if we want to, return damaged area"""
         damage = None
@@ -54,7 +62,6 @@ class Plotter(object):
             pos = None
             if seriesdata.lastPos is not None:
                 pos = seriesdata.lastPos
-                self.ctx.move_to(*pos)
             
             for n in range(seriesdata.lastPlottedSample, lastSample):
                 damage = True
@@ -63,17 +70,23 @@ class Plotter(object):
                 x_value = sample["x"]
                 y_value = sample["y"]
                 if self.xAxis.wrap:
-                    x_value = (x_value - self.xAxis.min) % (self.xAxis.max-self.xAxis.min) + self.xAxis.min
+                    x_value = (x_value - self.xAxis.min) % (self.xAxis.max - self.xAxis.min) + self.xAxis.min
                 lastpos = pos
                 pos = (self.xAxis.map(x_value) * self.size[0], self.yAxis.map(y_value) * self.size[1])
                 
                 if lastpos is not None and profile.lineWidth is not None:
                     if pos[0] >= lastpos[0]:
+                        self.ctx.move_to(*lastpos)
                         self.ctx.line_to(*pos)
                         self.ctx.stroke()
                 if profile.point:
                     self.ctx.arc(pos[0], pos[1], profile.point, 0, math.pi*2)
                     self.ctx.fill()
+                
+                if sample["x"] > self.highestX:
+                    if sample["x"] // 100 > self.highestX // 100:
+                        self.fade()
+                    self.highestX = sample["x"]
                 
             seriesdata.lastPlottedSample = lastSample
             if pos is not None:
